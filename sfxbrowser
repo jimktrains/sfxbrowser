@@ -6,6 +6,14 @@ import glob
 import os.path
 import tkSnack
 import re
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('rootdir', default='Sound Effects/') 
+args = parser.parse_args()
+
+if not args.rootdir.endswith('/'):
+    args.rootdir += '/'
 
 parent = Tk()
 frm = ttk.Frame(parent, padding=10)
@@ -28,9 +36,8 @@ tkSnack.initializeSnack(parent)
 mysound = tkSnack.Sound()
 
 tree = ttk.Treeview(frm)
-rootdir = "Sound Effects/"
-for file in glob.iglob(f"{rootdir}**/*", recursive=True):
-    file = file.replace(rootdir, '')
+for file in glob.iglob(f"{args.rootdir}**/*", recursive=True):
+    file = file.replace(args.rootdir, '')
     (head, tail) = os.path.split(file)
     tree.insert(parent=head, index='end', iid=file, text=tail)
 
@@ -90,7 +97,7 @@ def treeclick(event):
     firstfile = tree.selection()[0]
     filename_label.config(text=firstfile)
     if firstfile.endswith('wav'):
-        mysound.read(f"{rootdir}{firstfile}")
+        mysound.read(f"{args.rootdir}{firstfile}")
         (length, rate, maxv, minv, encoding, channels, fileFormat, headerSize) = mysound.info()
         length_s = length / rate
         length_var.set(f"{length_s:3.2f}")
