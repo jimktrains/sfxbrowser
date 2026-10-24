@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+
+from tkinter import *
+from tkinter import ttk
+import glob
+import os.path
+import tkSnack
+import re
+
+parent = Tk()
+frm = ttk.Frame(parent, padding=10)
+frm.grid()
+
+props = ttk.Frame(frm, padding=10)
+props.grid(row=1,column=3,rowspan=5)
+
+length_var = StringVar()
+ttk.Label(props, text="Length").grid(row=1,column=1)
+length_label = ttk.Label(props, textvariable=length_var)
+length_label.grid(row=1,column=2)
+
+ttk.Label(props, text="Tags").grid(row=2,column=1)
+tags_entry = Text(props,width=30,height=10)
+tags_entry.grid(row=2,column=2)
+
+
+tkSnack.initializeSnack(parent)
+mysound = tkSnack.Sound()
+
+tree = ttk.Treeview(frm)
+rootdir = "Sound Effects/"
+for file in glob.iglob(f"{rootdir}**/*", recursive=True):
+    file = file.replace(rootdir, '')
+    (head, tail) = os.path.split(file)
+    tree.insert(parent=head, index='end', iid=file, text=tail)
+
+def update_filename_label_width(event):
+    pass
+    #print(event)
+    #print(filename_label.bbox())
+    #print(frm.grid_bbox(column=2, row=0))
+    #print(frm.grid_bbox(column=2, row=1))
+    #new_width = event.width 
+    #bbox = frm.grid_bbox(column=2, row=0)
+    #new_width = bbox[2] - bbox[0]
+    #print(f"{new_width=}")
+    #filename_label.config(wraplength=new_width)
+    #print("====")
+
+search_text = Entry(frm)
+search_text.grid(column=0,row=0)
+
+detached_nodes = set()
+
+def deretach(child, cb):
+    #print(f"examining {child}")
+    if child.endswith('wav'):
+        (head, tail) = os.path.split(child)
+        if cb(child):
+            if child in detached_nodes:
+                tree.reattach(child, head, 0)
+                detached_nodes.remove(child)
+        else:
+            if child not in detached_nodes:
+                detached_nodes.add(child)
+                tree.detach(child)
+
+def walk_node(node, cb):
+    for child in tree.get_children(item=node):
+        deretach(child, cb)
+        walk_node(child, cb)
+
+def update_search(event):
+    phrase = search_text.get()
+    if len(phrase) > 4 or (len(phrase) == 0 and len(detached_nodes) != 0):
+        searchre = re.compile(".*" + phrase + ".*", re.IGNORECASE)
+
+        detached_list = list(detached_nodes)
+        for child in detached_list:
+            deretach(child, searchre.match)
+        walk_node('', searchre.match)
+
+
+filename_label = ttk.Label(frm, text="")
+filename_label.grid(column=2, row=0)
+
+search_text.bind("<KeyRelease>", update_search)
+
+def treeclick(event):
+    firstfile = tree.selection()[0]
+    filename_label.config(text=firstfile)
+    if firstfile.endswith('wav'):
+        mysound.read(f"{rootdir}{firstfile}")
+        (length, rate, maxv, minv, encoding, channels, fileFormat, headerSize) = mysound.info()
+        length_s = length / rate
+        length_var.set(f"{length_s:3.2f}")
+        mysound.play()
+
+
+
+c = tkSnack.SnackCanvas(frm, height=400)
+c.create_waveform(0, 0, sound=mysound, height=100, zerolevel=1)
+c.create_spectrogram(0, 150, sound=mysound, height=200)
+c.grid(column=2,row=2)
+
+tree.grid(column=0,row=1, columnspan=2, rowspan=5,sticky='nsew')
+tree.bind("<<TreeviewSelect>>", treeclick)
+parent.bind("<Configure>", update_filename_label_width)
+
+ttk.Button(frm, text="Play (<spacebar>)", command=lambda :mysound.play()).grid(column=2, row=1)
+parent.bind("q", lambda ev:parent.destroy())
+parent.bind("<space>", lambda ev:mysound.play())
+parent.mainloop()
