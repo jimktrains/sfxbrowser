@@ -119,7 +119,7 @@ def walk_node(node, cb):
 
 def update_search(event):
     phrase = search_text.get()
-    if len(phrase) > 4 or (len(phrase) == 0 and len(detached_nodes) != 0):
+    if len(phrase) > 3 or (len(phrase) == 0 and len(detached_nodes) != 0):
         searchre = re.compile(".*" + phrase + ".*", re.IGNORECASE)
 
         detached_list = list(detached_nodes)
