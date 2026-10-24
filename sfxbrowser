@@ -23,6 +23,10 @@ frm.grid()
 props = ttk.Frame(frm, padding=10)
 props.grid(row=1,column=3,rowspan=5)
 
+def is_sound_file(filename):
+    (bn, ext) = os.path.splitext(filename)
+    return ext in ['.wav']
+
 length_var = StringVar()
 ttk.Label(props, text="Length").grid(row=1,column=1)
 length_label = ttk.Label(props, textvariable=length_var)
@@ -58,7 +62,6 @@ class RepeatTimer(threading.Thread):
                     c.delete(self.scrub_line)
                 if elapsed < length_s:
                     x = int(500 / length_s * elapsed)
-                    print(f"{x=}")
                     self.scrub_line = c.create_line(x, 0, x, 350, width=2)
         isstopped.set()
 
@@ -77,9 +80,10 @@ def doplay(e=None):
 
 tree = ttk.Treeview(frm)
 for file in glob.iglob(f"{args.rootdir}**/*", recursive=True):
-    file = file.replace(args.rootdir, '')
-    (head, tail) = os.path.split(file)
-    tree.insert(parent=head, index='end', iid=file, text=tail)
+    if os.path.isdir(file) or is_sound_file(file):
+        file = file.replace(args.rootdir, '')
+        (head, tail) = os.path.split(file)
+        tree.insert(parent=head, index='end', iid=file, text=tail)
 
 def update_filename_label_width(event):
     pass
@@ -99,9 +103,11 @@ search_text.grid(column=0,row=0)
 
 detached_nodes = set()
 
+
+
 def deretach(child, cb):
     #print(f"examining {child}")
-    if child.endswith('wav'):
+    if is_sound_file(child):
         (head, tail) = os.path.split(child)
         if cb(child):
             if child in detached_nodes:
@@ -111,6 +117,10 @@ def deretach(child, cb):
             if child not in detached_nodes:
                 detached_nodes.add(child)
                 tree.detach(child)
+def playnext(event):
+    firstfile = tree.selection()[0]
+    (head, tail) = os.path.split(child)
+
 
 def walk_node(node, cb):
     for child in tree.get_children(item=node):
@@ -136,7 +146,9 @@ search_text.bind("<KeyRelease>", update_search)
 def treeclick(event):
     firstfile = tree.selection()[0]
     filename_label.config(text=firstfile)
-    if firstfile.endswith('wav'):
+    if os.path.isdir(f"{args.rootdir}{firstfile}"):
+        return
+    if is_sound_file(firstfile):
         mysound.read(f"{args.rootdir}{firstfile}")
         (length, rate, maxv, minv, encoding, channels, fileFormat, headerSize) = mysound.info()
         length_s = length / rate
@@ -152,5 +164,7 @@ parent.bind("<Configure>", update_filename_label_width)
 
 ttk.Button(frm, text="Play (<spacebar>)", command=lambda :doplay()).grid(column=2, row=1)
 parent.bind("q", quitall)
+parent.bind("<Down>", playnext)
 parent.bind("<space>", doplay)
 parent.mainloop()
+stopsched.set()
