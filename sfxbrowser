@@ -7,6 +7,7 @@ import os.path
 import tkSnack
 import re
 import argparse
+import threading
 
 parser = argparse.ArgumentParser()
 parser.add_argument('rootdir', default='Sound Effects/') 
@@ -27,13 +28,52 @@ ttk.Label(props, text="Length").grid(row=1,column=1)
 length_label = ttk.Label(props, textvariable=length_var)
 length_label.grid(row=1,column=2)
 
-ttk.Label(props, text="Tags").grid(row=2,column=1)
-tags_entry = Text(props,width=30,height=10)
-tags_entry.grid(row=2,column=2)
+# ttk.Label(props, text="Tags").grid(row=2,column=1)
+# tags_entry = Text(props,width=30,height=10)
+# tags_entry.grid(row=2,column=2)
 
 
 tkSnack.initializeSnack(parent)
 mysound = tkSnack.Sound()
+
+c = tkSnack.SnackCanvas(frm, height=400, width=500)
+c.create_waveform(0, 0, sound=mysound, height=100, zerolevel=1, width=500)
+c.create_spectrogram(0, 150, sound=mysound, height=200, width=500)
+c.grid(column=2,row=2)
+
+class RepeatTimer(threading.Thread):
+    def __init__(self, event, isstopped):
+        super().__init__()
+        self.stopped = event
+        self.isstopped = isstopped
+        self.scrub_line = None
+
+    def run(self):
+        while not self.stopped.wait(1/60):
+            (length, rate, maxv, minv, encoding, channels, fileFormat, headerSize) = mysound.info()
+            length_s = length / rate
+            elapsed = tkSnack.audio.elapsedTime()
+            if elapsed > 0:
+                if self.scrub_line is not None:
+                    c.delete(self.scrub_line)
+                if elapsed < length_s:
+                    x = int(500 / length_s * elapsed)
+                    print(f"{x=}")
+                    self.scrub_line = c.create_line(x, 0, x, 350, width=2)
+        isstopped.set()
+
+stopsched = threading.Event()
+isstopped = threading.Event()
+thread = RepeatTimer(stopsched, isstopped)
+thread.start()
+
+def quitall(e):
+    stopsched.set()
+    isstopped.wait()
+    parent.destroy()
+
+def doplay(e=None):
+    mysound.play()
 
 tree = ttk.Treeview(frm)
 for file in glob.iglob(f"{args.rootdir}**/*", recursive=True):
@@ -100,21 +140,17 @@ def treeclick(event):
         mysound.read(f"{args.rootdir}{firstfile}")
         (length, rate, maxv, minv, encoding, channels, fileFormat, headerSize) = mysound.info()
         length_s = length / rate
-        length_var.set(f"{length_s:3.2f}")
-        mysound.play()
+        length_var.set(f"{length_s:3.2f}s")
+        doplay()
 
 
 
-c = tkSnack.SnackCanvas(frm, height=400)
-c.create_waveform(0, 0, sound=mysound, height=100, zerolevel=1)
-c.create_spectrogram(0, 150, sound=mysound, height=200)
-c.grid(column=2,row=2)
 
 tree.grid(column=0,row=1, columnspan=2, rowspan=5,sticky='nsew')
 tree.bind("<<TreeviewSelect>>", treeclick)
 parent.bind("<Configure>", update_filename_label_width)
 
-ttk.Button(frm, text="Play (<spacebar>)", command=lambda :mysound.play()).grid(column=2, row=1)
-parent.bind("q", lambda ev:parent.destroy())
-parent.bind("<space>", lambda ev:mysound.play())
+ttk.Button(frm, text="Play (<spacebar>)", command=lambda :doplay()).grid(column=2, row=1)
+parent.bind("q", quitall)
+parent.bind("<space>", doplay)
 parent.mainloop()
