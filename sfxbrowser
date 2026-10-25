@@ -78,7 +78,11 @@ def quitall(e):
 def doplay(e=None):
     mysound.play()
 
-tree = ttk.Treeview(frm)
+tree = ttk.Treeview(frm, selectmode='browse')
+vsb = ttk.Scrollbar(tree, orient="vertical", command=tree.yview)
+vsb.pack(side='right', fill='y')
+tree.configure(yscrollcommand=vsb.set)
+
 for file in glob.iglob(f"{args.rootdir}**/*", recursive=True):
     if os.path.isdir(file) or is_sound_file(file):
         file = file.replace(args.rootdir, '')
@@ -117,10 +121,6 @@ def deretach(child, cb):
             if child not in detached_nodes:
                 detached_nodes.add(child)
                 tree.detach(child)
-def playnext(event):
-    firstfile = tree.selection()[0]
-    (head, tail) = os.path.split(child)
-
 
 def walk_node(node, cb):
     for child in tree.get_children(item=node):
@@ -155,16 +155,12 @@ def treeclick(event):
         length_var.set(f"{length_s:3.2f}s")
         doplay()
 
-
-
-
 tree.grid(column=0,row=1, columnspan=2, rowspan=5,sticky='nsew')
 tree.bind("<<TreeviewSelect>>", treeclick)
 parent.bind("<Configure>", update_filename_label_width)
 
 ttk.Button(frm, text="Play (<spacebar>)", command=lambda :doplay()).grid(column=2, row=1)
 parent.bind("q", quitall)
-parent.bind("<Down>", playnext)
 parent.bind("<space>", doplay)
 parent.mainloop()
 stopsched.set()
